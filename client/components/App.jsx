@@ -6,6 +6,8 @@ import TrackPanel from './TrackPanel';
 import HeaderBar from './HeaderBar';
 import PatternPanel from './PatternPanel';
 import DAW from '../api/daw';
+import Pattern from '../api/pattern';
+import TrackPattern from '../api/track-pattern';
 
 /**
  * @param {Object} props
@@ -36,6 +38,25 @@ function App(props) {
     daw.stop();
   };
 
+  const handleNewPattern = () => {
+    const pattern = new Pattern(
+      'New Pattern',
+      [],
+      2,
+      Math.floor(Math.random() * 360)
+    );
+
+    const trackPattern = new TrackPattern(pattern.id, Array.from({ length: 16 }).map(() => 0));
+
+    daw.project.patterns.push(pattern);
+    daw.project.track.trackPatterns.push(trackPattern);
+    setActivePatternId(pattern.id);
+  };
+
+  const handleClearPattern = () => {
+    daw.project.patterns[activePatternId].clear();
+  };
+
   return (
     <>
       <HeaderBar onPlay={handlePlay} onStop={handleStop} />
@@ -51,9 +72,15 @@ function App(props) {
           <TrackPanel daw={daw} onPatternView={handlePatternView} />
         </TabPanel>
         <TabPanel value='2'>
-          <PatternPanel daw={daw} activePatternId={activePatternId} setActivePatternId={setActivePatternId} />
+          <PatternPanel
+            daw={daw}
+            activePatternId={activePatternId}
+            setActivePatternId={setActivePatternId}
+            onNewPattern={handleNewPattern}
+            onClearPattern={handleClearPattern}
+          />
         </TabPanel>
-        <TabPanel value='3'>Item Three</TabPanel>
+        <TabPanel value='3'>Audio wave analyzer</TabPanel>
       </TabContext>
     </>
   );

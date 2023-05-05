@@ -9,15 +9,21 @@ import {
 import Pattern from '../api/pattern';
 
 function PatternPanelHeader(props) {
-  const { activePatternId, hue, setHue, patterns, onPatternChange } = props;
+  const {
+    activePatternId, hue, setHue, playbackRate, setPlaybackRate, bars, setBars, patterns, onNewPattern, onPatternChange, onClearPattern
+  } = props;
 
-  const [bars, setBars] = React.useState(2);
   const [pan, setPan] = React.useState(50);
   const [gain, setGain] = React.useState(100);
 
   const handleHueChange = (event) => {
     const value = Number(event.target.value);
     setHue(value);
+  };
+
+  const handlePlaybackRateChange = (event) => {
+    const value = Number(event.target.value) / 100;
+    setPlaybackRate(value);
   };
 
   const handleBarsChange = (event) => {
@@ -43,6 +49,14 @@ function PatternPanelHeader(props) {
     setGain(value);
   };
 
+  const handleNewPattern = () => {
+    onNewPattern();
+  };
+
+  const handleClearPattern = () => {
+    onClearPattern();
+  };
+
   return (
     <AppBar position='static'>
       <Toolbar
@@ -55,7 +69,9 @@ function PatternPanelHeader(props) {
         >
           {/* NEW PATTERN */}
           <Tooltip title='New Pattern'>
-            <IconButton>
+            <IconButton
+              onClick={handleNewPattern}
+            >
               <Add />
             </IconButton>
           </Tooltip>
@@ -85,7 +101,7 @@ function PatternPanelHeader(props) {
 
           {/* CLEAR PATTERN */}
           <Tooltip title='Clear' arrow>
-            <IconButton>
+            <IconButton onClick={handleClearPattern}>
               <ClearAll />
             </IconButton>
           </Tooltip>
@@ -98,6 +114,7 @@ function PatternPanelHeader(props) {
           </Tooltip>
         </Stack>
 
+        {/* HUE */}
         <TextField
           label='Hue'
           value={hue}
@@ -115,13 +132,35 @@ function PatternPanelHeader(props) {
           }}
         />
 
+        {/* RATE */}
+        <TextField
+          label='Rate'
+          value={playbackRate * 100}
+          size='small'
+          sx={{
+            width: 100
+          }}
+          onChange={handlePlaybackRateChange}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position='end'>%</InputAdornment>
+            )
+          }}
+        />
+
+        {/* BARS */}
         <TextField
           label='Bars'
           value={bars}
           size='small'
-          onChange={handleBarsChange}
+          sx={{
+            width: 100
+          }}
+          onSubmit={handleBarsChange}
+          disabled
         />
 
+        {/* PAN */}
         <Stack
           direction='row'
           spacing={2}
@@ -145,6 +184,7 @@ function PatternPanelHeader(props) {
           />
         </Stack>
 
+        {/* GAIN */}
         <Stack
           direction='row'
           spacing={2}
@@ -176,8 +216,14 @@ PatternPanelHeader.propTypes = {
   activePatternId: PropTypes.number.isRequired,
   hue: PropTypes.number.isRequired,
   setHue: PropTypes.func.isRequired,
+  playbackRate: PropTypes.number.isRequired,
+  setPlaybackRate: PropTypes.func.isRequired,
+  bars: PropTypes.number.isRequired,
+  setBars: PropTypes.func.isRequired,
   patterns: PropTypes.arrayOf(PropTypes.instanceOf(Pattern)).isRequired,
-  onPatternChange: PropTypes.func.isRequired
+  onPatternChange: PropTypes.func.isRequired,
+  onNewPattern: PropTypes.func.isRequired,
+  onClearPattern: PropTypes.func.isRequired
 };
 
 export default PatternPanelHeader;

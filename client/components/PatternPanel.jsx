@@ -5,7 +5,6 @@ import {
 } from '@mui/material';
 import DAW from '../api/daw';
 import Note from '../api/note';
-import Pattern from '../api/pattern';
 import PatternPanelHeader from './PatternPanelHeader';
 
 /**
@@ -13,23 +12,24 @@ import PatternPanelHeader from './PatternPanelHeader';
  * @param {DAW} props.daw
  * @param {number} props.activePatternId
  * @param {function} props.setActivePatternId
+ * @param {function} props.onNewPattern
+ * @param {function} props.onClearPattern
  * @returns {JSX.Element}
  */
 function PatternPanel(props) {
-  const { daw, activePatternId, setActivePatternId } = props;
+  const {
+    daw, activePatternId, setActivePatternId, onNewPattern, onClearPattern
+  } = props;
   const { pack } = daw;
   const { files } = pack;
   const { project } = daw;
   const { patterns } = project;
   const [barSize, setBarSize] = React.useState(0);
   const [hue, setHue] = React.useState(patterns[activePatternId].hue);
+  const [playbackRate, setPlaybackRate] = React.useState(patterns[activePatternId].control.playbackRate);
+  const [bars, setBars] = React.useState(patterns[activePatternId].bars);
 
   const canvasRef = React.useRef(null);
-
-  const handlePatternChange = (event) => {
-    setActivePatternId(event.target.value);
-    setHue(patterns[event.target.value].hue);
-  };
 
   const draw = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -58,15 +58,32 @@ function PatternPanel(props) {
         let lum = 0;
 
         if (b % 2 === 0) {
-          lum += 18;
+          lum = 18;
         } else {
-          lum += 16;
+          lum = 16;
         }
 
         ctx.fillStyle = `hsl(200, 0%, ${lum}%)`;
 
         ctx.fillRect(b * barSize, (barSize + spacer) * i, barSize, barSize);
       }
+    }
+
+    for (let b = 1; b < pattern.bars * 4; b++) {
+      ctx.strokeStyle = '#bbbbbb';
+      ctx.lineWidth = b % 4 === 0 ? 4 : 1;
+      ctx.beginPath();
+      ctx.moveTo(b * barSize * 4, 0);
+      ctx.lineTo(b * barSize * 4, canvas.height);
+      ctx.stroke();
+    }
+
+    for (let b = 0; b < pattern.bars * 4; b++) {
+      ctx.fillStyle = '#f0f0f0';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${b + 1}`, b * barSize * 4 + 8, 4);
     }
 
     for (let n = 0; n < notes.length; n++) {
@@ -82,10 +99,29 @@ function PatternPanel(props) {
     }
   }, [activePatternId, barSize, files.length, patterns]);
 
-  const handleSetHue = (hue) => {
-    patterns[activePatternId].hue = hue;
+  const handlePatternChange = (event) => {
+    setActivePatternId(event.target.value);
+    setHue(patterns[event.target.value].hue);
+  };
+
+  const handleSetHue = (value) => {
+    patterns[activePatternId].hue = value;
     draw();
-    setHue(hue);
+    setHue(value);
+  };
+
+  const handleSetPlaybackRate = (value) => {
+    patterns[activePatternId].control.playbackRate = value;
+    setPlaybackRate(value);
+  };
+
+  const handleNewPattern = () => {
+    onNewPattern();
+  };
+
+  const handleClearPattern = () => {
+    onClearPattern();
+    draw();
   };
 
   const handleClick = React.useCallback((event) => {
@@ -137,8 +173,14 @@ function PatternPanel(props) {
         activePatternId={activePatternId}
         hue={hue}
         setHue={handleSetHue}
+        playbackRate={playbackRate}
+        setPlaybackRate={handleSetPlaybackRate}
+        bars={bars}
+        setBars={setBars}
         patterns={patterns}
+        onNewPattern={handleNewPattern}
         onPatternChange={handlePatternChange}
+        onClearPattern={handleClearPattern}
       />
       <Stack component={Paper} direction='row' spacing={1} sx={{ p: 1 }}>
         <Stack direction='column' spacing={1}>
@@ -160,7 +202,9 @@ function PatternPanel(props) {
 PatternPanel.propTypes = {
   daw: PropTypes.instanceOf(DAW).isRequired,
   activePatternId: PropTypes.number.isRequired,
-  setActivePatternId: PropTypes.func.isRequired
+  setActivePatternId: PropTypes.func.isRequired,
+  onNewPattern: PropTypes.func.isRequired,
+  onClearPattern: PropTypes.func.isRequired
 };
 
 export default PatternPanel;

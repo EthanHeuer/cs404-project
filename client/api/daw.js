@@ -47,12 +47,23 @@ class DAW {
             const sample = this.pack.getSample(note.sampleId);
             const { audioBuffer, bpm } = sample;
 
-            const offset = (note.beat / (note.control.playbackRate * trackPattern.control.playbackRate * pattern.control.playbackRate) + b * 8) * this.project.rate;
+            const delay = note.control.delay + trackPattern.control.delay + pattern.control.delay;
+            const offset = ((note.beat + delay) / (trackPattern.control.playbackRate * pattern.control.playbackRate) + b * 4) * this.project.rate;
 
-            const playbackRate = (this.project.bpm / bpm) * note.control.playbackRate;
-            const detune = note.control.detune;
-            const gain = note.control.gain;
-            const pan = note.control.pan;
+            const playbackRate = (this.project.bpm / bpm) * note.control.playbackRate * trackPattern.control.playbackRate * pattern.control.playbackRate;
+            const detune = note.control.detune + trackPattern.control.detune + pattern.control.detune;
+            let gain = note.control.gain * trackPattern.control.gain * pattern.control.gain;
+            let pan = note.control.pan + trackPattern.control.pan + pattern.control.pan;
+
+            if (gain > 1) {
+              gain = 1;
+            }
+
+            if (pan > 1) {
+              pan = 1;
+            } else if (pan < -1) {
+              pan = -1;
+            }
 
             this.audioHandler.playSample(
               this.audioHandler.controlNode(pattern.control),

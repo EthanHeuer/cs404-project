@@ -45,9 +45,9 @@ function TrackPanel(props) {
           let lum = 0;
 
           if (b % 2 === 0) {
-            lum = 15;
+            lum = 18;
           } else {
-            lum = 12;
+            lum = 16;
           }
 
           ctx.fillStyle = `hsl(200, 0%, ${lum}%)`;
@@ -57,8 +57,21 @@ function TrackPanel(props) {
 
         for (let b = 0; b < trackPattern.bars.length; b++) {
           if (trackPattern.bars[b] === 1) {
+            ctx.strokeStyle = `hsl(${pattern.hue}, 100%, 50%)`;
+            ctx.lineWidth = 0.2 * barHeight;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(b * barWidth + 0.5 * barWidth, (barHeight + spacer) * i + 0.5 * barHeight);
+            ctx.lineTo(b * barWidth + 0.5 * barWidth + (pattern.bars * (1 / pattern.control.playbackRate) - 1) * barWidth, (barHeight + spacer) * i + 0.5 * barHeight);
+            ctx.stroke();
+
             ctx.fillStyle = `hsl(${pattern.hue}, 100%, 50%)`;
-            ctx.fillRect(b * barWidth, (barHeight + spacer) * i, barWidth * pattern.bars, barHeight);
+            ctx.beginPath();
+            ctx.arc(b * barWidth + 0.5 * barWidth, (barHeight + spacer) * i + 0.5 * barHeight, 0.2 * barHeight, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // ctx.fillRect(b * barWidth, (barHeight + spacer) * i, barWidth * pattern.bars, barHeight);
           }
         }
       }
@@ -79,7 +92,7 @@ function TrackPanel(props) {
       trackPattern.bars[barIndex] = trackPattern.bars[barIndex] === 1 ? 0 : 1;
       draw();
     });
-  }, [trackPatterns]);
+  }, [project, trackPatterns]);
 
   const handlePatternView = (event) => {
     onPatternView(event.target.value);
@@ -96,7 +109,10 @@ function TrackPanel(props) {
             return (
               <Button
                 key={pattern.id}
-                sx={{ whiteSpace: 'nowrap' }}
+                sx={{
+                  whiteSpace: 'nowrap',
+                  height: '100px'
+                }}
                 value={pattern.id}
                 onClick={handlePatternView}
               >

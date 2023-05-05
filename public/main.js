@@ -26461,16 +26461,16 @@
   // node_modules/@mui/utils/esm/ClassNameGenerator/ClassNameGenerator.js
   var defaultGenerator = (componentName) => componentName;
   var createClassNameGenerator = () => {
-    let generate2 = defaultGenerator;
+    let generate = defaultGenerator;
     return {
       configure(generator) {
-        generate2 = generator;
+        generate = generator;
       },
       generate(componentName) {
-        return generate2(componentName);
+        return generate(componentName);
       },
       reset() {
-        generate2 = defaultGenerator;
+        generate = defaultGenerator;
       }
     };
   };
@@ -48456,14 +48456,16 @@ Please use another name.` : formatMuiErrorMessage(18));
     /**
      * @param {number} detune
      * @param {number} playbackRate
-     * @param {number} gain
-     * @param {number} pan
+     * @param {number} gain 0 to 1
+     * @param {number} pan \-1 to 1
+     * @param {number} delay
      */
-    constructor(detune, playbackRate, gain, pan) {
+    constructor(detune, playbackRate, gain, pan, delay) {
       this.detune = detune;
       this.playbackRate = playbackRate;
       this.gain = gain;
       this.pan = pan;
+      this.delay = delay;
       if (this.detune === null || this.detune === void 0) {
         this.detune = 0;
       }
@@ -48476,6 +48478,9 @@ Please use another name.` : formatMuiErrorMessage(18));
       if (this.pan === null || this.pan === void 0) {
         this.pan = 0;
       }
+      if (this.delay === null || this.delay === void 0) {
+        this.delay = 0;
+      }
     }
     /**
      * @param {ControlObject} controlObject
@@ -48486,7 +48491,8 @@ Please use another name.` : formatMuiErrorMessage(18));
         controlObject.detune,
         controlObject.playbackRate,
         controlObject.gain,
-        controlObject.pan
+        controlObject.pan,
+        controlObject.delay
       );
       return control;
     }
@@ -48534,8 +48540,10 @@ Please use another name.` : formatMuiErrorMessage(18));
         playbackRate: control.playbackRate,
         detune: control.detune
       });
+      const gainNode = new GainNode(this.audioCtx, { gain: control.gain });
+      const panNode = new StereoPannerNode(this.audioCtx, { pan: control.pan });
       const node2 = this.controlNode(control);
-      sampleSource.connect(node2).connect(patternControl).connect(trackPatternControl).connect(this.audioCtx.destination);
+      sampleSource.connect(node2).connect(patternControl).connect(trackPatternControl).connect(panNode).connect(gainNode).connect(this.audioCtx.destination);
       sampleSource.start(this.audioCtx.currentTime + time);
       this.audioBuffers.push(sampleSource);
       return sampleSource;
@@ -48665,6 +48673,12 @@ Please use another name.` : formatMuiErrorMessage(18));
         res(this.notes[i]);
       }
     }
+    /**
+     * Clear all notes
+     */
+    clear() {
+      this.notes = [];
+    }
   };
   var Pattern = _Pattern;
   __publicField(Pattern, "nextId", 0);
@@ -48757,11 +48771,20 @@ Please use another name.` : formatMuiErrorMessage(18));
             pattern.iterate((note) => {
               const sample = this.pack.getSample(note.sampleId);
               const { audioBuffer, bpm } = sample;
-              const offset2 = (note.beat / (note.control.playbackRate * trackPattern2.control.playbackRate * pattern.control.playbackRate) + b * 8) * this.project.rate;
-              const playbackRate = this.project.bpm / bpm * note.control.playbackRate;
-              const detune = note.control.detune;
-              const gain = note.control.gain;
-              const pan = note.control.pan;
+              const delay = note.control.delay + trackPattern2.control.delay + pattern.control.delay;
+              const offset2 = ((note.beat + delay) / (trackPattern2.control.playbackRate * pattern.control.playbackRate) + b * 4) * this.project.rate;
+              const playbackRate = this.project.bpm / bpm * note.control.playbackRate * trackPattern2.control.playbackRate * pattern.control.playbackRate;
+              const detune = note.control.detune + trackPattern2.control.detune + pattern.control.detune;
+              let gain = note.control.gain * trackPattern2.control.gain * pattern.control.gain;
+              let pan = note.control.pan + trackPattern2.control.pan + pattern.control.pan;
+              if (gain > 1) {
+                gain = 1;
+              }
+              if (pan > 1) {
+                pan = 1;
+              } else if (pan < -1) {
+                pan = -1;
+              }
               this.audioHandler.playSample(
                 this.audioHandler.controlNode(pattern.control),
                 this.audioHandler.controlNode(trackPattern2.control),
@@ -48813,17 +48836,26 @@ Please use another name.` : formatMuiErrorMessage(18));
           for (let b = 0; b < trackPattern2.bars.length; b++) {
             let lum = 0;
             if (b % 2 === 0) {
-              lum = 15;
+              lum = 18;
             } else {
-              lum = 12;
+              lum = 16;
             }
             ctx.fillStyle = `hsl(200, 0%, ${lum}%)`;
             ctx.fillRect(b * barWidth, (barHeight + spacer) * i, barWidth, barHeight);
           }
           for (let b = 0; b < trackPattern2.bars.length; b++) {
             if (trackPattern2.bars[b] === 1) {
+              ctx.strokeStyle = `hsl(${pattern.hue}, 100%, 50%)`;
+              ctx.lineWidth = 0.2 * barHeight;
+              ctx.lineCap = "round";
+              ctx.beginPath();
+              ctx.moveTo(b * barWidth + 0.5 * barWidth, (barHeight + spacer) * i + 0.5 * barHeight);
+              ctx.lineTo(b * barWidth + 0.5 * barWidth + (pattern.bars * (1 / pattern.control.playbackRate) - 1) * barWidth, (barHeight + spacer) * i + 0.5 * barHeight);
+              ctx.stroke();
               ctx.fillStyle = `hsl(${pattern.hue}, 100%, 50%)`;
-              ctx.fillRect(b * barWidth, (barHeight + spacer) * i, barWidth * pattern.bars, barHeight);
+              ctx.beginPath();
+              ctx.arc(b * barWidth + 0.5 * barWidth, (barHeight + spacer) * i + 0.5 * barHeight, 0.2 * barHeight, 0, 2 * Math.PI);
+              ctx.fill();
             }
           }
         }
@@ -48839,7 +48871,7 @@ Please use another name.` : formatMuiErrorMessage(18));
         trackPattern2.bars[barIndex] = trackPattern2.bars[barIndex] === 1 ? 0 : 1;
         draw();
       });
-    }, [trackPatterns]);
+    }, [project2, trackPatterns]);
     const handlePatternView = (event) => {
       onPatternView(event.target.value);
     };
@@ -48850,7 +48882,10 @@ Please use another name.` : formatMuiErrorMessage(18));
         Button_default,
         {
           key: pattern.id,
-          sx: { whiteSpace: "nowrap" },
+          sx: {
+            whiteSpace: "nowrap",
+            height: "100px"
+          },
           value: pattern.id,
           onClick: handlePatternView
         },
@@ -48923,13 +48958,28 @@ Please use another name.` : formatMuiErrorMessage(18));
 
   // client/components/PatternPanelHeader.jsx
   function PatternPanelHeader(props) {
-    const { activePatternId, hue, setHue, patterns: patterns2, onPatternChange } = props;
-    const [bars, setBars] = import_react14.default.useState(2);
+    const {
+      activePatternId,
+      hue,
+      setHue,
+      playbackRate,
+      setPlaybackRate,
+      bars,
+      setBars,
+      patterns: patterns2,
+      onNewPattern,
+      onPatternChange,
+      onClearPattern
+    } = props;
     const [pan, setPan] = import_react14.default.useState(50);
     const [gain, setGain] = import_react14.default.useState(100);
     const handleHueChange = (event) => {
       const value = Number(event.target.value);
       setHue(value);
+    };
+    const handlePlaybackRateChange = (event) => {
+      const value = Number(event.target.value) / 100;
+      setPlaybackRate(value);
     };
     const handleBarsChange = (event) => {
       const value = Number(event.target.value);
@@ -48949,6 +48999,12 @@ Please use another name.` : formatMuiErrorMessage(18));
       const value = Number(event.target.value);
       setGain(value);
     };
+    const handleNewPattern = () => {
+      onNewPattern();
+    };
+    const handleClearPattern = () => {
+      onClearPattern();
+    };
     return /* @__PURE__ */ import_react14.default.createElement(AppBar_default, { position: "static" }, /* @__PURE__ */ import_react14.default.createElement(
       Toolbar_default,
       {
@@ -48961,7 +49017,13 @@ Please use another name.` : formatMuiErrorMessage(18));
         {
           direction: "row"
         },
-        /* @__PURE__ */ import_react14.default.createElement(Tooltip_default, { title: "New Pattern" }, /* @__PURE__ */ import_react14.default.createElement(IconButton_default, null, /* @__PURE__ */ import_react14.default.createElement(Add_default, null))),
+        /* @__PURE__ */ import_react14.default.createElement(Tooltip_default, { title: "New Pattern" }, /* @__PURE__ */ import_react14.default.createElement(
+          IconButton_default,
+          {
+            onClick: handleNewPattern
+          },
+          /* @__PURE__ */ import_react14.default.createElement(Add_default, null)
+        )),
         /* @__PURE__ */ import_react14.default.createElement(
           FormControl_default,
           {
@@ -48983,7 +49045,7 @@ Please use another name.` : formatMuiErrorMessage(18));
             patterns2.map((pattern) => /* @__PURE__ */ import_react14.default.createElement(MenuItem_default, { key: pattern.id, value: pattern.id }, pattern.name))
           )
         ),
-        /* @__PURE__ */ import_react14.default.createElement(Tooltip_default, { title: "Clear", arrow: true }, /* @__PURE__ */ import_react14.default.createElement(IconButton_default, null, /* @__PURE__ */ import_react14.default.createElement(ClearAll_default, null))),
+        /* @__PURE__ */ import_react14.default.createElement(Tooltip_default, { title: "Clear", arrow: true }, /* @__PURE__ */ import_react14.default.createElement(IconButton_default, { onClick: handleClearPattern }, /* @__PURE__ */ import_react14.default.createElement(ClearAll_default, null))),
         /* @__PURE__ */ import_react14.default.createElement(Tooltip_default, { title: "Delete", arrow: true }, /* @__PURE__ */ import_react14.default.createElement(IconButton_default, null, /* @__PURE__ */ import_react14.default.createElement(Clear_default, null)))
       ),
       /* @__PURE__ */ import_react14.default.createElement(
@@ -49004,10 +49066,29 @@ Please use another name.` : formatMuiErrorMessage(18));
       /* @__PURE__ */ import_react14.default.createElement(
         TextField_default,
         {
+          label: "Rate",
+          value: playbackRate * 100,
+          size: "small",
+          sx: {
+            width: 100
+          },
+          onChange: handlePlaybackRateChange,
+          InputProps: {
+            endAdornment: /* @__PURE__ */ import_react14.default.createElement(InputAdornment_default, { position: "end" }, "%")
+          }
+        }
+      ),
+      /* @__PURE__ */ import_react14.default.createElement(
+        TextField_default,
+        {
           label: "Bars",
           value: bars,
           size: "small",
-          onChange: handleBarsChange
+          sx: {
+            width: 100
+          },
+          onSubmit: handleBarsChange,
+          disabled: true
         }
       ),
       /* @__PURE__ */ import_react14.default.createElement(
@@ -49076,25 +49157,35 @@ Please use another name.` : formatMuiErrorMessage(18));
     activePatternId: import_prop_types71.default.number.isRequired,
     hue: import_prop_types71.default.number.isRequired,
     setHue: import_prop_types71.default.func.isRequired,
+    playbackRate: import_prop_types71.default.number.isRequired,
+    setPlaybackRate: import_prop_types71.default.func.isRequired,
+    bars: import_prop_types71.default.number.isRequired,
+    setBars: import_prop_types71.default.func.isRequired,
     patterns: import_prop_types71.default.arrayOf(import_prop_types71.default.instanceOf(pattern_default)).isRequired,
-    onPatternChange: import_prop_types71.default.func.isRequired
+    onPatternChange: import_prop_types71.default.func.isRequired,
+    onNewPattern: import_prop_types71.default.func.isRequired,
+    onClearPattern: import_prop_types71.default.func.isRequired
   };
   var PatternPanelHeader_default = PatternPanelHeader;
 
   // client/components/PatternPanel.jsx
   function PatternPanel(props) {
-    const { daw: daw2, activePatternId, setActivePatternId } = props;
+    const {
+      daw: daw2,
+      activePatternId,
+      setActivePatternId,
+      onNewPattern,
+      onClearPattern
+    } = props;
     const { pack: pack2 } = daw2;
     const { files } = pack2;
     const { project: project2 } = daw2;
     const { patterns: patterns2 } = project2;
     const [barSize, setBarSize] = import_react15.default.useState(0);
     const [hue, setHue] = import_react15.default.useState(patterns2[activePatternId].hue);
+    const [playbackRate, setPlaybackRate] = import_react15.default.useState(patterns2[activePatternId].control.playbackRate);
+    const [bars, setBars] = import_react15.default.useState(patterns2[activePatternId].bars);
     const canvasRef = import_react15.default.useRef(null);
-    const handlePatternChange = (event) => {
-      setActivePatternId(event.target.value);
-      setHue(patterns2[event.target.value].hue);
-    };
     const draw = import_react15.default.useCallback(() => {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
@@ -49116,13 +49207,28 @@ Please use another name.` : formatMuiErrorMessage(18));
         for (let b = 0; b < pattern.bars * 4 * 4; b++) {
           let lum = 0;
           if (b % 2 === 0) {
-            lum += 18;
+            lum = 18;
           } else {
-            lum += 16;
+            lum = 16;
           }
           ctx.fillStyle = `hsl(200, 0%, ${lum}%)`;
           ctx.fillRect(b * barSize, (barSize + spacer) * i, barSize, barSize);
         }
+      }
+      for (let b = 1; b < pattern.bars * 4; b++) {
+        ctx.strokeStyle = "#bbbbbb";
+        ctx.lineWidth = b % 4 === 0 ? 4 : 1;
+        ctx.beginPath();
+        ctx.moveTo(b * barSize * 4, 0);
+        ctx.lineTo(b * barSize * 4, canvas.height);
+        ctx.stroke();
+      }
+      for (let b = 0; b < pattern.bars * 4; b++) {
+        ctx.fillStyle = "#f0f0f0";
+        ctx.font = "14px Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(`${b + 1}`, b * barSize * 4 + 8, 4);
       }
       for (let n = 0; n < notes.length; n++) {
         const note = notes[n];
@@ -49134,10 +49240,25 @@ Please use another name.` : formatMuiErrorMessage(18));
         ctx.fill();
       }
     }, [activePatternId, barSize, files.length, patterns2]);
-    const handleSetHue = (hue2) => {
-      patterns2[activePatternId].hue = hue2;
+    const handlePatternChange = (event) => {
+      setActivePatternId(event.target.value);
+      setHue(patterns2[event.target.value].hue);
+    };
+    const handleSetHue = (value) => {
+      patterns2[activePatternId].hue = value;
       draw();
-      setHue(hue2);
+      setHue(value);
+    };
+    const handleSetPlaybackRate = (value) => {
+      patterns2[activePatternId].control.playbackRate = value;
+      setPlaybackRate(value);
+    };
+    const handleNewPattern = () => {
+      onNewPattern();
+    };
+    const handleClearPattern = () => {
+      onClearPattern();
+      draw();
     };
     const handleClick = import_react15.default.useCallback((event) => {
       const canvas = canvasRef.current;
@@ -49175,15 +49296,23 @@ Please use another name.` : formatMuiErrorMessage(18));
         activePatternId,
         hue,
         setHue: handleSetHue,
+        playbackRate,
+        setPlaybackRate: handleSetPlaybackRate,
+        bars,
+        setBars,
         patterns: patterns2,
-        onPatternChange: handlePatternChange
+        onNewPattern: handleNewPattern,
+        onPatternChange: handlePatternChange,
+        onClearPattern: handleClearPattern
       }
     ), /* @__PURE__ */ import_react15.default.createElement(Stack_default, { component: Paper_default, direction: "row", spacing: 1, sx: { p: 1 } }, /* @__PURE__ */ import_react15.default.createElement(Stack_default, { direction: "column", spacing: 1 }, files.map((file) => /* @__PURE__ */ import_react15.default.createElement(Button_default, { key: file.id, sx: { whiteSpace: "nowrap" } }, file.name))), /* @__PURE__ */ import_react15.default.createElement(Divider_default, { orientation: "vertical", flexItem: true }), /* @__PURE__ */ import_react15.default.createElement(Box_default, { sx: { flexGrow: 1, overflow: "auto" } }, /* @__PURE__ */ import_react15.default.createElement("canvas", { ref: canvasRef }))));
   }
   PatternPanel.propTypes = {
     daw: import_prop_types72.default.instanceOf(daw_default).isRequired,
     activePatternId: import_prop_types72.default.number.isRequired,
-    setActivePatternId: import_prop_types72.default.func.isRequired
+    setActivePatternId: import_prop_types72.default.func.isRequired,
+    onNewPattern: import_prop_types72.default.func.isRequired,
+    onClearPattern: import_prop_types72.default.func.isRequired
   };
   var PatternPanel_default = PatternPanel;
 
@@ -49206,7 +49335,31 @@ Please use another name.` : formatMuiErrorMessage(18));
     const handleStop = () => {
       daw2.stop();
     };
-    return /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, /* @__PURE__ */ import_react16.default.createElement(HeaderBar_default, { onPlay: handlePlay, onStop: handleStop }), /* @__PURE__ */ import_react16.default.createElement(TabContext, { value }, /* @__PURE__ */ import_react16.default.createElement(Stack_default, { sx: { borderBottom: 1, borderColor: "divider" }, direction: "row" }, /* @__PURE__ */ import_react16.default.createElement(TabList_default, { onChange: handleChange }, /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Track", value: "1" }), /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Pattern", value: "2" }), /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Analyzer", value: "3" }))), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "1" }, /* @__PURE__ */ import_react16.default.createElement(TrackPanel_default, { daw: daw2, onPatternView: handlePatternView })), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "2" }, /* @__PURE__ */ import_react16.default.createElement(PatternPanel_default, { daw: daw2, activePatternId, setActivePatternId })), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "3" }, "Item Three")));
+    const handleNewPattern = () => {
+      const pattern = new pattern_default(
+        "New Pattern",
+        [],
+        2,
+        Math.floor(Math.random() * 360)
+      );
+      const trackPattern2 = new track_pattern_default(pattern.id, Array.from({ length: 16 }).map(() => 0));
+      daw2.project.patterns.push(pattern);
+      daw2.project.track.trackPatterns.push(trackPattern2);
+      setActivePatternId(pattern.id);
+    };
+    const handleClearPattern = () => {
+      daw2.project.patterns[activePatternId].clear();
+    };
+    return /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, /* @__PURE__ */ import_react16.default.createElement(HeaderBar_default, { onPlay: handlePlay, onStop: handleStop }), /* @__PURE__ */ import_react16.default.createElement(TabContext, { value }, /* @__PURE__ */ import_react16.default.createElement(Stack_default, { sx: { borderBottom: 1, borderColor: "divider" }, direction: "row" }, /* @__PURE__ */ import_react16.default.createElement(TabList_default, { onChange: handleChange }, /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Track", value: "1" }), /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Pattern", value: "2" }), /* @__PURE__ */ import_react16.default.createElement(Tab_default, { label: "Analyzer", value: "3" }))), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "1" }, /* @__PURE__ */ import_react16.default.createElement(TrackPanel_default, { daw: daw2, onPatternView: handlePatternView })), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "2" }, /* @__PURE__ */ import_react16.default.createElement(
+      PatternPanel_default,
+      {
+        daw: daw2,
+        activePatternId,
+        setActivePatternId,
+        onNewPattern: handleNewPattern,
+        onClearPattern: handleClearPattern
+      }
+    )), /* @__PURE__ */ import_react16.default.createElement(TabPanel_default, { value: "3" }, "Audio wave analyzer")));
   }
   App.propTypes = {
     daw: import_prop_types73.default.instanceOf(daw_default).isRequired
@@ -49229,45 +49382,87 @@ Please use another name.` : formatMuiErrorMessage(18));
     ["fill-3", 175],
     ["hat", 175]
   ], "/samples", "wav");
-  var GRAMMAR = /* @__PURE__ */ new Map([
-    ["S", ["PP"]],
-    ["P", ["AB"]],
-    ["A", ["k-sk", "k-s-", "k--s", "kks-"]],
-    ["B", ["-s-s", "--s-", "-ks-", "-sks"]]
-  ]);
-  var generate = (symbol) => {
-    if (!GRAMMAR.has(symbol)) {
-      return symbol;
-    }
-    const alternatives = GRAMMAR.get(symbol);
-    const random = Math.floor(Math.random() * alternatives.length);
-    const alternative = alternatives[random];
-    return alternative.split("").map(generate).join("");
-  };
-  var patterns = [];
-  for (let p = 0; p < 5; p++) {
-    const pattern = new pattern_default(`Pattern ${p + 1}`, [], 2, Math.floor(Math.random() * 360));
-    const generated = generate("S");
-    for (let n = 0; n < generated.length; n++) {
-      const symbol = generated[n];
-      let sampleName = "";
-      const random = Math.floor(3 * __pow(Math.random(), 1.7) + 1);
-      if (symbol === "k") {
-        sampleName = `kick-${random}`;
-      } else if (symbol === "s") {
-        sampleName = `snare-${random}`;
-      } else if (symbol === "-") {
-        sampleName = `fill-${random}`;
-      }
-      const sampleId = pack.getSampleByName(sampleName).id;
-      pattern.notes.push(new note_default(sampleId, n / 2));
-    }
-    patterns.push(pattern);
-  }
+  var KICK_CRASH = 0;
+  var KICK_1 = 1;
+  var KICK_2 = 2;
+  var KICK_3 = 3;
+  var KICK_FILL_1 = 4;
+  var SNARE_1 = 6;
+  var SNARE_2 = 7;
+  var SNARE_3 = 8;
+  var FILL_1 = 9;
+  var FILL_2 = 10;
+  var FILL_3 = 11;
+  var HAT = 12;
+  var pattern1 = new pattern_default("Pattern A", [
+    new note_default(KICK_1, 0),
+    new note_default(FILL_1, 0.5),
+    new note_default(SNARE_1, 1),
+    new note_default(FILL_1, 1.5),
+    new note_default(FILL_1, 2),
+    new note_default(SNARE_2, 2.5),
+    new note_default(FILL_2, 3),
+    new note_default(SNARE_2, 3.5),
+    new note_default(KICK_1, 4),
+    new note_default(FILL_1, 4.5),
+    new note_default(SNARE_1, 5),
+    new note_default(HAT, 5.5),
+    new note_default(KICK_CRASH, 6),
+    new note_default(SNARE_2, 6.5),
+    new note_default(SNARE_3, 7),
+    new note_default(SNARE_2, 7.5)
+  ], 2, 15);
+  var pattern2 = new pattern_default("Pattern B", [
+    new note_default(KICK_2, 0),
+    new note_default(FILL_2, 0.5),
+    new note_default(SNARE_2, 1),
+    new note_default(FILL_2, 1.5),
+    new note_default(FILL_2, 2),
+    new note_default(SNARE_3, 2.5),
+    new note_default(FILL_3, 3),
+    new note_default(SNARE_3, 3.5),
+    new note_default(KICK_2, 4),
+    new note_default(FILL_2, 4.5),
+    new note_default(SNARE_2, 5),
+    new note_default(HAT, 5.5),
+    new note_default(KICK_CRASH, 6),
+    new note_default(SNARE_3, 6.5),
+    new note_default(SNARE_1, 7),
+    new note_default(SNARE_3, 7.5)
+  ], 2, 65);
+  var halfStep = new pattern_default("Half Step", [
+    new note_default(KICK_3, 0),
+    new note_default(FILL_1, 0.25),
+    new note_default(SNARE_2, 0.5),
+    new note_default(FILL_1, 0.75),
+    new note_default(SNARE_3, 1),
+    new note_default(FILL_2, 1.25),
+    new note_default(SNARE_3, 1.5),
+    new note_default(FILL_2, 1.75),
+    new note_default(KICK_3, 2),
+    new note_default(FILL_1, 2.25),
+    new note_default(SNARE_2, 2.5),
+    new note_default(HAT, 2.75),
+    new note_default(KICK_CRASH, 3),
+    new note_default(SNARE_3, 3.25),
+    new note_default(SNARE_1, 3.5),
+    new note_default(SNARE_3, 3.75)
+  ], 1, 115, { playbackRate: 0.5, gain: 0.8 });
+  var fill1 = new pattern_default(
+    "Fill 1",
+    [
+      ...Array.from({ length: 4 }).map((_2, i) => new note_default(KICK_FILL_1, i)),
+      ...Array.from({ length: 8 }).map((_2, i) => new note_default(SNARE_2, 0.25 * i + 2, { gain: 0.125 * i }))
+    ],
+    1,
+    200
+  );
+  var patterns = [pattern1, pattern2, halfStep, fill1];
   var trackPattern = [];
-  trackPattern.push(new track_pattern_default(0, [1, 0, 0, 0, 1, 0, 0, 0]));
-  trackPattern.push(new track_pattern_default(1, [0, 0, 1, 0, 0, 0, 0, 0]));
-  trackPattern.push(new track_pattern_default(2, [0, 0, 0, 0, 0, 0, 1, 0]));
+  trackPattern.push(new track_pattern_default(0, [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]));
+  trackPattern.push(new track_pattern_default(1, [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]));
+  trackPattern.push(new track_pattern_default(2, [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0]));
+  trackPattern.push(new track_pattern_default(3, [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]));
   var track = new track_default(trackPattern);
   var project = new project_default(175, track, patterns);
   var daw = new daw_default(pack, project);

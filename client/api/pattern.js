@@ -30,6 +30,13 @@ class Pattern {
     }
   }
 
+  /**
+   * Clear all notes
+   */
+  clear() {
+    this.notes = [];
+  }
+
   static nextId = 0;
 }
 

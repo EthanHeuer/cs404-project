@@ -45,14 +45,17 @@ class AudioHandler {
       detune: control.detune
     });
 
-    /*
     const gainNode = new GainNode(this.audioCtx, { gain: control.gain });
-    const pannerNode = new StereoPannerNode(this.audioCtx, { pan: control.pan });
-    */
+    const panNode = new StereoPannerNode(this.audioCtx, { pan: control.pan });
 
     const node = this.controlNode(control);
 
-    sampleSource.connect(node).connect(patternControl).connect(trackPatternControl).connect(this.audioCtx.destination);
+    sampleSource.connect(node)
+      .connect(patternControl)
+      .connect(trackPatternControl)
+      .connect(panNode)
+      .connect(gainNode)
+      .connect(this.audioCtx.destination);
 
     sampleSource.start(this.audioCtx.currentTime + time);
     this.audioBuffers.push(sampleSource);
